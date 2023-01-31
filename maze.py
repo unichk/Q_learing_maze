@@ -39,7 +39,7 @@ def get_neighbor_girds(grid):
     return valid_moves
 
 # generate maze with a seed
-def generate_maze(seed = random.randint(0, 65535)):
+def generate_maze(seed):
     # set seed
     print(f'seed = {seed}')
     random.seed(seed)
@@ -81,6 +81,7 @@ def generate_maze(seed = random.randint(0, 65535)):
     
     return maze_vertical_walls, maze_horizontal_walls
 
+# draw maze
 def draw_maze(maze, start_point, end_point):
     vertical_walls, horizontal_walls = maze
 
@@ -120,6 +121,7 @@ def draw_maze(maze, start_point, end_point):
         # right
         pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(WIN_WIDTH - WALL_WIDTH, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
 
+# draw window
 def draw_window(maze, start_point, end_point, player):
     # draw background
     WIN.fill(BACKGROUND_COLOR)
@@ -150,6 +152,7 @@ def get_valid_moves(maze, player_pos):
 
     return valid_moves
 
+# move player with wasd
 def move_player(maze, player_pos, keys_pressed):
     valid_moves = get_valid_moves(maze, player_pos)
     if (keys_pressed == pygame.K_w) and ((-1, 0) in valid_moves):
@@ -163,16 +166,32 @@ def move_player(maze, player_pos, keys_pressed):
 
     return player_pos
 
+# new game
+def new_game(maze, player, player_pos):
+    maze = generate_maze(random.randint(1, 65535))
+    player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
+    player_pos = (0, 0)
+    return maze, player, player_pos
+
+# reset game
+def reset_game(player, player_pos):
+    player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
+    player_pos = (0, 0)
+    return player, player_pos
+
+# main function
 def main():
     clock = pygame.time.Clock()
     run = True
 
-    maze = generate_maze()
+    # init game
+    maze = generate_maze(random.randint(1, 65535))
     start_point = pygame.Rect(WALL_WIDTH, WALL_WIDTH, GRID_WIDTH, GRID_HEIGHT)
     end_point = pygame.Rect(WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
     player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_pos = (0, 0)
 
+    # game loop
     while run:
         clock.tick(FPS)
         for event in pygame.event.get():
@@ -180,9 +199,15 @@ def main():
                 run = False
 
             if event.type == pygame.KEYDOWN:
+                # update player pos from input
                 player_pos = move_player(maze, player_pos, event.key)
                 player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
                 player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+                
+                # check has the player finished
+                if player.colliderect(end_point):
+                    # restart game
+                    maze, player, player_pos = new_game(maze, player, player_pos)
 
         draw_window(maze, start_point, end_point, player)
 
