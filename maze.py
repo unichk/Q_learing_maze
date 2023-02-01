@@ -1,6 +1,9 @@
+# region import
 import pygame
 import random
+# endregion import
 
+# region CONSTANT
 # window settings
 WIN_WIDTH, WIN_HEIGHT = 600, 600
 WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
@@ -24,6 +27,13 @@ GRID_WIDTH, GRID_HEIGHT = (WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
 PRESS_COOLDOWN = 0.5
 
+# tring constans
+FRAME_PER_MOVE = 20
+MOVE_PER_EPISODE = MAZE_SIZE[0] * MAZE_SIZE[1]
+
+# endregion CONSTANT
+
+# region maze game
 # get all valid move of a grid
 def get_neighbor_girds(grid):
     row, col = grid
@@ -179,6 +189,46 @@ def reset_game(player, player_pos):
     player_pos = (0, 0)
     return player, player_pos
 
+# endregion maze game
+
+# region Qlearning
+class Qlearning():
+    # state:player pos:(row, col) action:0->up, 1->left, 2->down, 3->right
+    def __init__(self, episodes, epsilon_decay = 0.99, learning_rate = 0.1, discount_factor = 0.5):
+        self.epsilon = 1
+        self.current_episode = 1
+        self.episodes = episodes
+        self.epsilon_decay = epsilon_decay
+        self.learing_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.q_table = dict()
+        for row in range(MAZE_SIZE[0]):
+            for col in range(MAZE_SIZE[1]):
+                for a in range(4):
+                    self.q_table[(row, col)].append(0)
+
+    def choose_action(self, state):
+        if random.random() < self.epsilon:
+            return random.randint(0, 3)
+        else:
+            actions_q_value = self.q_table[state]
+            return actions_q_value.index(max(actions_q_value))
+    
+    def update_q_value(self, state, state_plus1, action, reward):
+        if random.random() < self.epsilon:
+            future_reward = self.q_table[state_plus1][random.randint(0, 3)]
+        else:
+            actions_q_value = self.q_table[state_plus1]
+            future_reward = max(actions_q_value)
+        self.q_table[state][action] = self.q_table[state][action] + self.learing_rate * (reward + self.discount_factor * future_reward - self.q_table[state][action])
+    
+    def end_episode(self):
+        self.epsilon *= self.epsilon_decay
+        self.current_episode += 1
+
+# endregion Qlearning
+
+# region main
 # main function
 def main():
     clock = pygame.time.Clock()
@@ -191,6 +241,11 @@ def main():
     player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_pos = (0, 0)
 
+    # init training
+    move_clock = FRAME_PER_MOVE
+    move_left = MOVE_PER_EPISODE
+    q_learing = Qlearning(100)
+
     # game loop
     while run:
         clock.tick(FPS)
@@ -198,20 +253,65 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-            if event.type == pygame.KEYDOWN:
-                # update player pos from input
-                player_pos = move_player(maze, player_pos, event.key)
-                player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
-                player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+            # region keyboard control
+            # if event.type == pygame.KEYDOWN:
+            #     # update player pos from input
+            #     player_pos = move_player(maze, player_pos, event.key)
+            #     player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
+            #     player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
                 
-                # check has the player finished
-                if player.colliderect(end_point):
-                    # restart game
-                    maze, player, player_pos = new_game(maze, player, player_pos)
+            #     # check has the player finished
+            #     if player.colliderect(end_point):
+            #         # restart game
+            #         maze, player, player_pos = new_game(maze, player, player_pos)
+            # endregion keyboard control
+
+        # make action and update q table
+        if move_clock == 0:
+            # choose action and move
+            player_pos_before = player_pos
+            action = q_learing.choose_action(player_pos)
+            valid_moves = get_valid_moves(maze, player)
+            moved = False
+            if action == 0 and (-1, 0) in valid_moves:
+                player_pos = (player_pos[0] - 1, player_pos[1])
+                moved = True
+            elif action == 1 and (0, -1) in valid_moves:
+                player_pos = (player_pos[0], player_pos[1] - 1)
+                moved = True
+            elif action == 2 and (1, 0) in valid_moves:
+                player_pos = (player_pos[0] + 1, player_pos[1])
+                moved = True
+            elif action == 3 and (0, 1) in valid_moves:
+                player_pos = (player_pos[0], player_pos[1] + 1)
+                moved = True
+            player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
+            player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+            move_left -= 1
+
+            # calculate reward
+            if not moved:
+                reward = -1
+            if player.colliderect(end_point):
+                reward = 10
+
+            # Update Q table
+            q_learing.update_q_value(player_pos_before, player_pos, action, reward)
+
+            # end episode if finish or out of moves
+            if move_left == 0 or player.colliderect(end_point):
+                q_learing.end_episode()
+                player, player_pos = reset_game(player, player_pos)
+
+            # reset move clock
+            move_clock = FRAME_PER_MOVE
 
         draw_window(maze, start_point, end_point, player)
+        move_clock -= 1
 
     pygame.quit()
+
+# endregion main
 
 if __name__ == '__main__':
     main()
