@@ -5,7 +5,7 @@ import random
 
 # region CONSTANT
 # window settings
-WIN_WIDTH, WIN_HEIGHT = 600, 600
+WIN_WIDTH, WIN_HEIGHT = 1000, 600
 WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 pygame.display.set_caption("Maze")
 
@@ -19,19 +19,27 @@ BORDER_COLOR = (155, 155, 155)
 PLAYER_COLOR = (250, 112, 202)
 START_POINT_COLOR = (15, 140, 36)
 END_POINT_COLOR = (186, 7, 7)
+TEXT_COLOR = (0, 0, 0)
 
 # game constants
+GAME_WIN_WIDTH, GAME_WIN_HEIGHT = 600, 600
 MAZE_SIZE = (5, 5)
 WALL_WIDTH = 10
-GRID_WIDTH, GRID_HEIGHT = (WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
+GRID_WIDTH, GRID_HEIGHT = (GAME_WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (GAME_WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
 PRESS_COOLDOWN = 0.5
 
 # tring constans
-FRAME_PER_MOVE = 20
+FRAME_PER_MOVE = 5
 MOVE_PER_EPISODE = MAZE_SIZE[0] * MAZE_SIZE[1]
 
+# text constant
+FONT = "Verdana"
+FONT_SIZE = 30
+
 # endregion CONSTANT
+
+pygame.init()
 
 # region maze game
 # get all valid move of a grid
@@ -122,17 +130,17 @@ def draw_maze(maze, start_point, end_point):
         # up
         pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, 0,  GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
         # down
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, WIN_HEIGHT - WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
+        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, GAME_WIN_HEIGHT - WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
     # vertical
     for row in range(MAZE_SIZE[0]):
         y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
         # left
         pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(0, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
         # right
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(WIN_WIDTH - WALL_WIDTH, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
 
 # draw window
-def draw_window(maze, start_point, end_point, player):
+def draw_window(maze, start_point, end_point, player, texts):
     # draw background
     WIN.fill(BACKGROUND_COLOR)
     
@@ -141,6 +149,11 @@ def draw_window(maze, start_point, end_point, player):
 
     # draw player 
     pygame.draw.rect(WIN, PLAYER_COLOR, player)
+
+    y_coord = 20
+    for text in texts:
+        WIN.blit(text, (GAME_WIN_WIDTH + 30, y_coord))    
+        y_coord += FONT_SIZE * 13 / 9
 
     # upadate window
     pygame.display.update()
@@ -205,7 +218,7 @@ class Qlearning():
         for row in range(MAZE_SIZE[0]):
             for col in range(MAZE_SIZE[1]):
                 for a in range(4):
-                    self.q_table[(row, col)].append(0)
+                    self.q_table[(row, col)] = [0, 0, 0, 0]
 
     def choose_action(self, state):
         if random.random() < self.epsilon:
@@ -237,14 +250,20 @@ def main():
     # init game
     maze = generate_maze(random.randint(1, 65535))
     start_point = pygame.Rect(WALL_WIDTH, WALL_WIDTH, GRID_WIDTH, GRID_HEIGHT)
-    end_point = pygame.Rect(WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
+    end_point = pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, GAME_WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
     player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_pos = (0, 0)
 
     # init training
     move_clock = FRAME_PER_MOVE
     move_left = MOVE_PER_EPISODE
-    q_learing = Qlearning(100)
+    q_learing = Qlearning(100, 0.98)
+
+    # init panel texts
+    font = pygame.font.SysFont(FONT, FONT_SIZE)
+    texts = []
+    texts.append(font.render(f'episode num: {q_learing.current_episode}', True, TEXT_COLOR))
+    texts.append(font.render(f'move left: {move_left}', True, TEXT_COLOR))
 
     # game loop
     while run:
@@ -271,7 +290,7 @@ def main():
             # choose action and move
             player_pos_before = player_pos
             action = q_learing.choose_action(player_pos)
-            valid_moves = get_valid_moves(maze, player)
+            valid_moves = get_valid_moves(maze, player_pos)
             moved = False
             if action == 0 and (-1, 0) in valid_moves:
                 player_pos = (player_pos[0] - 1, player_pos[1])
@@ -289,6 +308,7 @@ def main():
             player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
             move_left -= 1
 
+            reward = 0
             # calculate reward
             if not moved:
                 reward = -1
@@ -298,15 +318,20 @@ def main():
             # Update Q table
             q_learing.update_q_value(player_pos_before, player_pos, action, reward)
 
+            # update text
+            texts[0] = font.render(f'episode num: {q_learing.current_episode}', True, TEXT_COLOR)
+            texts[1] = font.render(f'move left: {move_left}', True, TEXT_COLOR)
+
             # end episode if finish or out of moves
             if move_left == 0 or player.colliderect(end_point):
                 q_learing.end_episode()
                 player, player_pos = reset_game(player, player_pos)
+                move_left = MOVE_PER_EPISODE
 
             # reset move clock
             move_clock = FRAME_PER_MOVE
 
-        draw_window(maze, start_point, end_point, player)
+        draw_window(maze, start_point, end_point, player, texts)
         move_clock -= 1
 
     pygame.quit()
