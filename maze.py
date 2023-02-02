@@ -31,7 +31,6 @@ PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
 PRESS_COOLDOWN = 0.5
 
 # tring constans
-FRAME_PER_MOVE = 1
 MOVE_PER_EPISODE = MAZE_SIZE[0] * MAZE_SIZE[1]
 
 # text constant
@@ -154,7 +153,8 @@ def draw_q_values(q_learning):
             WIN.blit(font.render(f'{q_learning.q_table[(row, col)][3]:.2f}', True, TEXT_COLOR), (x_coord + WALL_WIDTH + GRID_WIDTH * 5 / 9, y_coord + WALL_WIDTH + GRID_HEIGHT *4 / 9))
 
 # draw window
-def draw_window(maze, start_point, end_point, player, q_learning, display_q_values, texts):
+def draw_window(maze, start_point, end_point, player, q_learning, display_q_values, texts, speed):
+    font = pygame.font.SysFont(FONT, FONT_SIZE)
     # draw background
     WIN.fill(BACKGROUND_COLOR)
     
@@ -175,7 +175,6 @@ def draw_window(maze, start_point, end_point, player, q_learning, display_q_valu
         y_coord += FONT_SIZE * 13 / 9
 
     # draw q value button
-    font = pygame.font.SysFont(FONT, FONT_SIZE)
     WIN.blit(font.render(f'Q value: ', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30, y_coord))
     WIN.blit(font.render(f'show', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 9 * FONT_SIZE * 0.52, y_coord))
     WIN.blit(font.render(f'hide', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 15 * FONT_SIZE * 0.52, y_coord))
@@ -187,10 +186,25 @@ def draw_window(maze, start_point, end_point, player, q_learning, display_q_valu
         pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, hide_q_values_button, int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
     y_coord += FONT_SIZE * 13 / 9
 
+    # draw speed buttons
+    WIN.blit(font.render(f'speed: ', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30, y_coord))
+    WIN.blit(font.render(f'1', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 8 * FONT_SIZE * 0.52, y_coord))
+    WIN.blit(font.render(f'2', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 10 * FONT_SIZE * 0.52, y_coord))
+    WIN.blit(font.render(f'3', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 12 * FONT_SIZE * 0.52, y_coord))
+    WIN.blit(font.render(f'4', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 14 * FONT_SIZE * 0.52, y_coord))
+    WIN.blit(font.render(f'5', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 16 * FONT_SIZE * 0.52, y_coord))
+    speed_button = []
+    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 7.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
+    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 9.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
+    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 11.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
+    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 13.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
+    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 15.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
+    pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, speed_button[speed], int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
+
     # upadate window
     pygame.display.update()
     
-    return show_q_values_button, hide_q_values_button
+    return show_q_values_button, hide_q_values_button, speed_button
 
 # get all valid moves of the position
 def get_valid_moves(maze, player_pos):
@@ -289,7 +303,8 @@ def main():
     player_pos = (0, 0)
 
     # init training
-    move_clock = FRAME_PER_MOVE
+    frame_per_move = 1
+    move_clock = frame_per_move
     move_left = MOVE_PER_EPISODE
     q_learning = Qlearning(100, 0.98)
 
@@ -298,11 +313,15 @@ def main():
     texts = []
     texts.append(font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR))
     texts.append(font.render(f'move left: {move_left}', True, TEXT_COLOR))
+    texts.append(font.render(f'epsilon: {q_learning.epsilon}', True, TEXT_COLOR))
     
     # init button
     show_q_values = True
     show_q_values_button = pygame.Rect(0, 0, 0, 0)
     hide_q_values_button = pygame.Rect(0, 0, 0, 0)
+    speed = 2 # 0->1,60 1->2,30 2->3,10 3->4,5 4->5,1
+    speed_dict = {0:60, 1:30, 2:10, 3:5, 4:1}
+    speed_buttons = [pygame.Rect(0, 0, 0, 0)]*5
 
     # game loop
     while run:
@@ -311,12 +330,17 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-            # check is show/hide q value button is clicked
             if event.type == pygame.MOUSEBUTTONDOWN:
+                # check is show/hide q value button is clicked
                 if show_q_values_button.collidepoint(event.pos):
                     show_q_values = True
                 if hide_q_values_button.collidepoint(event.pos):
                     show_q_values = False
+                # check is speed buttons is clicked
+                for idx, button in enumerate(speed_buttons):
+                    if button.collidepoint(event.pos):
+                        speed = idx
+                        frame_per_move = speed_dict[idx]
             # region keyboard control
             # if event.type == pygame.KEYDOWN:
             #     # update player pos from input
@@ -366,6 +390,7 @@ def main():
             # update text
             texts[0] = font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR)
             texts[1] = font.render(f'move left: {move_left}', True, TEXT_COLOR)
+            texts[2] = font.render(f'epsilon: {q_learning.epsilon:.6f}', True, TEXT_COLOR)
 
             # end episode if finish or out of moves
             if move_left == 0 or player.colliderect(end_point):
@@ -374,9 +399,9 @@ def main():
                 move_left = MOVE_PER_EPISODE
 
             # reset move clock
-            move_clock = FRAME_PER_MOVE
+            move_clock = frame_per_move
 
-        show_q_values_button, hide_q_values_button = draw_window(maze, start_point, end_point, player, q_learning, show_q_values, texts)
+        show_q_values_button, hide_q_values_button, speed_buttons = draw_window(maze, start_point, end_point, player, q_learning, show_q_values, texts, speed)
         move_clock -= 1
 
     pygame.quit()
