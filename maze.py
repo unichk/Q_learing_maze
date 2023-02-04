@@ -3,6 +3,9 @@ import pygame
 import random
 # endregion import
 
+pygame.init()
+pygame.mixer.init()
+
 # region CONSTANT
 # window settings
 WIN_WIDTH, WIN_HEIGHT = 1000, 600
@@ -25,7 +28,7 @@ BUTTON_SELECTED_COLOR = (110, 110, 110)
 
 # game constants
 GAME_WIN_WIDTH, GAME_WIN_HEIGHT = 600, 600
-MAZE_SIZE = (10, 10)
+MAZE_SIZE = (5, 5)
 WALL_WIDTH = 10
 GRID_WIDTH, GRID_HEIGHT = (GAME_WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (GAME_WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
@@ -44,9 +47,11 @@ wall_image = pygame.image.load('wall.png')
 start_point_image = pygame.transform.scale(pygame.image.load('start_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
 end_point_image = pygame.transform.scale(pygame.image.load('end_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
 
-# endregion CONSTANT
+# sfx
+button_click_sfx = pygame.mixer.Sound("button_click_sfx.mp3")
+finish_sfx = pygame.mixer.Sound("finish_sfx.mp3")
 
-pygame.init()
+# endregion CONSTANT
 
 # region maze game
 # get all valid move of a grid
@@ -328,6 +333,8 @@ def main():
     move_clock = frame_per_move
     move_left = MOVE_PER_EPISODE
     q_learning = Qlearning(100)
+    first_finish_episode = None
+    minium_move_spent = 1e9
 
     # init panel texts
     font = pygame.font.SysFont(FONT, FONT_SIZE)
@@ -335,6 +342,8 @@ def main():
     texts.append(font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR))
     texts.append(font.render(f'move left: {move_left}', True, TEXT_COLOR))
     texts.append(font.render(f'epsilon: {q_learning.epsilon}', True, TEXT_COLOR))
+    texts.append(font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR))
+    texts.append(font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR))
     
     # init button
     show_q_values = True
@@ -355,13 +364,16 @@ def main():
                 # check is show/hide q value button is clicked
                 if show_q_values_button.collidepoint(event.pos):
                     show_q_values = True
+                    button_click_sfx.play()
                 if hide_q_values_button.collidepoint(event.pos):
                     show_q_values = False
+                    button_click_sfx.play()
                 # check is speed buttons is clicked
                 for idx, button in enumerate(speed_buttons):
                     if button.collidepoint(event.pos):
                         speed = idx
                         frame_per_move = speed_dict[idx]
+                        button_click_sfx.play()
             # region keyboard control
             # if event.type == pygame.KEYDOWN:
             #     # update player pos from input
@@ -404,6 +416,10 @@ def main():
                 reward -= 1
             if player.colliderect(end_point):
                 reward += 100
+                finish_sfx.play()
+                if first_finish_episode == None:
+                    first_finish_episode = q_learning.current_episode
+                minium_move_spent = min(minium_move_spent, MOVE_PER_EPISODE - move_left)
             for coin in coins:
                 if player.colliderect(coin):
                     reward += 5
@@ -422,6 +438,8 @@ def main():
             texts[0] = font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR)
             texts[1] = font.render(f'move left: {move_left}', True, TEXT_COLOR)
             texts[2] = font.render(f'epsilon: {q_learning.epsilon:.6f}', True, TEXT_COLOR)
+            texts[3] = font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR)
+            texts[4] = font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR)
 
             # end episode if finish or out of moves
             if move_left == 0 or player.colliderect(end_point):
