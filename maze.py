@@ -25,7 +25,7 @@ BUTTON_SELECTED_COLOR = (110, 110, 110)
 
 # game constants
 GAME_WIN_WIDTH, GAME_WIN_HEIGHT = 600, 600
-MAZE_SIZE = (7, 7)
+MAZE_SIZE = (10, 10)
 WALL_WIDTH = 10
 GRID_WIDTH, GRID_HEIGHT = (GAME_WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (GAME_WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
@@ -40,6 +40,9 @@ FONT_SIZE = 30
 
 # image
 coin_image = pygame.transform.scale(pygame.image.load('coin.png'), (GRID_WIDTH * 0.4, GRID_HEIGHT * 0.4))
+wall_image = pygame.image.load('wall.png')
+start_point_image = pygame.transform.scale(pygame.image.load('start_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
+end_point_image = pygame.transform.scale(pygame.image.load('end_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
 
 # endregion CONSTANT
 
@@ -110,9 +113,11 @@ def draw_maze(maze, start_point, end_point):
     vertical_walls, horizontal_walls = maze
 
     # draw start and end point
-    pygame.draw.rect(WIN, START_POINT_COLOR, start_point)
-    pygame.draw.rect(WIN, END_POINT_COLOR, end_point)
+    WIN.blit(start_point_image, (start_point.x + GRID_WIDTH * 0.15, start_point.y + GRID_HEIGHT * 0.15))
+    WIN.blit(end_point_image, (end_point.x + GRID_WIDTH * 0.15, end_point.y + GRID_HEIGHT * 0.15))
 
+    vertical_wall_image = pygame.transform.scale(wall_image, (WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+    horizontal_wall_image = pygame.transform.rotate(vertical_wall_image, 90)
     # draw maze wall
     for row in range(MAZE_SIZE[0]):
         for col in range(MAZE_SIZE[1]):
@@ -120,12 +125,12 @@ def draw_maze(maze, start_point, end_point):
             y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
             # vertical
             if vertical_walls[row][col]:
-                pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+                WIN.blit(vertical_wall_image, (x_coord, y_coord))
             else:
                 pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord, y_coord + WALL_WIDTH, WALL_WIDTH, GRID_HEIGHT))
             # horizontal
             if horizontal_walls[row][col]:
-                pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, y_coord, GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
+                WIN.blit(horizontal_wall_image, (x_coord, y_coord))
             else:
                 pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord + WALL_WIDTH, y_coord, GRID_HEIGHT, WALL_WIDTH))
 
@@ -134,16 +139,16 @@ def draw_maze(maze, start_point, end_point):
     for col in range(MAZE_SIZE[1]):
         x_coord = col * (GRID_WIDTH + WALL_WIDTH)
         # up
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, 0,  GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
+        WIN.blit(horizontal_wall_image, (x_coord, 0))
         # down
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(x_coord, GAME_WIN_HEIGHT - WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH, WALL_WIDTH))
+        WIN.blit(horizontal_wall_image, (x_coord, GAME_WIN_HEIGHT - WALL_WIDTH))
     # vertical
     for row in range(MAZE_SIZE[0]):
         y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
         # left
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(0, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+        WIN.blit(vertical_wall_image, (0, y_coord))
         # right
-        pygame.draw.rect(WIN, WALL_COLOR, pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH, y_coord, WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+        WIN.blit(vertical_wall_image, (GAME_WIN_WIDTH - WALL_WIDTH, y_coord))
 
 # draw q value
 def draw_q_values(q_learning):
