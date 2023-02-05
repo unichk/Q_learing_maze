@@ -28,7 +28,7 @@ BUTTON_SELECTED_COLOR = (110, 110, 110)
 
 # game constants
 GAME_WIN_WIDTH, GAME_WIN_HEIGHT = 600, 600
-MAZE_SIZE = (5, 5)
+MAZE_SIZE = (10, 10)
 WALL_WIDTH = 10
 GRID_WIDTH, GRID_HEIGHT = (GAME_WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (GAME_WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
@@ -46,6 +46,10 @@ coin_image = pygame.transform.scale(pygame.image.load('coin.png'), (GRID_WIDTH *
 wall_image = pygame.image.load('wall.png')
 start_point_image = pygame.transform.scale(pygame.image.load('start_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
 end_point_image = pygame.transform.scale(pygame.image.load('end_point.png'), (GRID_WIDTH * 0.7, GRID_HEIGHT * 0.7))
+player_up = pygame.transform.scale(pygame.image.load('player_up.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
+player_down = pygame.transform.scale(pygame.image.load('player_down.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
+player_left = pygame.transform.scale(pygame.image.load('player_left.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
+player_right = pygame.transform.scale(pygame.image.load('player_right.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
 
 # sfx
 button_click_sfx = pygame.mixer.Sound("button_click_sfx.mp3")
@@ -168,7 +172,7 @@ def draw_q_values(q_learning):
             WIN.blit(font.render(f'{q_learning.q_table[(row, col)][3]:.2f}', True, TEXT_COLOR), (x_coord + WALL_WIDTH + GRID_WIDTH * 5 / 9, y_coord + WALL_WIDTH + GRID_HEIGHT *4 / 9))
 
 # draw window
-def draw_window(maze, coins, start_point, end_point, player, q_learning, display_q_values, texts, speed):
+def draw_window(maze, coins, start_point, end_point, player, player_direction, q_learning, display_q_values, texts, speed):
     font = pygame.font.SysFont(FONT, FONT_SIZE)
     # draw background
     WIN.fill(BACKGROUND_COLOR)
@@ -185,8 +189,14 @@ def draw_window(maze, coins, start_point, end_point, player, q_learning, display
         draw_q_values(q_learning)
 
     # draw player 
-    pygame.draw.rect(WIN, PLAYER_COLOR, player)
-
+    if player_direction == "u":
+        WIN.blit(player_up, player)
+    elif player_direction == "d":
+        WIN.blit(player_down, player)
+    elif player_direction == "r":
+        WIN.blit(player_right, player)
+    elif player_direction == "l":
+        WIN.blit(player_left, player)
     # draw info
     y_coord = 20
     for text in texts:
@@ -325,6 +335,7 @@ def main():
     end_point = pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, GAME_WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
     player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_pos = (0, 0)
+    player_direction = "d"
     last_pos = None
     last_last_pos = None
 
@@ -390,22 +401,31 @@ def main():
         # make action and update q table
         if move_clock == 0:
             # choose action and move
+            # fix player direction
             player_pos_before = player_pos
             action = q_learning.choose_action(player_pos)
             valid_moves = get_valid_moves(maze, player_pos)
             moved = False
-            if action == 0 and (-1, 0) in valid_moves:
-                player_pos = (player_pos[0] - 1, player_pos[1])
-                moved = True
-            elif action == 1 and (0, -1) in valid_moves:
-                player_pos = (player_pos[0], player_pos[1] - 1)
-                moved = True
-            elif action == 2 and (1, 0) in valid_moves:
-                player_pos = (player_pos[0] + 1, player_pos[1])
-                moved = True
-            elif action == 3 and (0, 1) in valid_moves:
-                player_pos = (player_pos[0], player_pos[1] + 1)
-                moved = True
+            if action == 0:
+                if (-1, 0) in valid_moves:
+                    player_pos = (player_pos[0] - 1, player_pos[1])
+                    moved = True
+                player_direction = "u"
+            elif action == 1:
+                if (0, -1) in valid_moves:
+                    player_pos = (player_pos[0], player_pos[1] - 1)
+                    moved = True
+                player_direction = "l"
+            elif action == 2:
+                if (1, 0) in valid_moves:
+                    player_pos = (player_pos[0] + 1, player_pos[1])
+                    moved = True
+                player_direction = "d"
+            elif action == 3:
+                if (0, 1) in valid_moves:
+                    player_pos = (player_pos[0], player_pos[1] + 1)
+                    moved = True
+                player_direction = "r"
             player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
             player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
             move_left -= 1
@@ -451,7 +471,7 @@ def main():
             # reset move clock
             move_clock = frame_per_move
 
-        show_q_values_button, hide_q_values_button, speed_buttons = draw_window(maze, coins, start_point, end_point, player, q_learning, show_q_values, texts, speed)
+        show_q_values_button, hide_q_values_button, speed_buttons = draw_window(maze, coins, start_point, end_point, player, player_direction, q_learning, show_q_values, texts, speed)
         move_clock -= 1
 
     pygame.quit()
