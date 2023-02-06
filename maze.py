@@ -59,6 +59,43 @@ finish_sfx = pygame.mixer.Sound("finish_sfx.mp3")
 
 # endregion CONSTANT
 
+# region Qlearning
+class Qlearning():
+    # state:player pos:(row, col) action:0->up, 1->left, 2->down, 3->right
+    def __init__(self, episodes, epsilon_decay = 0.99, learning_rate = 0.1, discount_factor = 0.8):
+        self.epsilon = 1
+        self.current_episode = 1
+        self.episodes = episodes
+        self.epsilon_decay = epsilon_decay
+        self.learing_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.q_table = dict()
+        for row in range(MAZE_SIZE[0]):
+            for col in range(MAZE_SIZE[1]):
+                for a in range(4):
+                    self.q_table[(row, col)] = [0, 0, 0, 0]
+
+    def choose_action(self, state):
+        if random.random() < self.epsilon:
+            return random.randint(0, 3)
+        else:
+            actions_q_value = self.q_table[state]
+            return actions_q_value.index(max(actions_q_value))
+    
+    def update_q_value(self, state, state_plus1, action, reward):
+        if random.random() < self.epsilon:
+            future_reward = self.q_table[state_plus1][random.randint(0, 3)]
+        else:
+            actions_q_value = self.q_table[state_plus1]
+            future_reward = max(actions_q_value)
+        self.q_table[state][action] = self.q_table[state][action] + self.learing_rate * (reward + self.discount_factor * future_reward - self.q_table[state][action])
+    
+    def end_episode(self):
+        self.epsilon *= self.epsilon_decay
+        self.current_episode += 1
+
+# endregion Qlearning
+
 # region maze game
 # maze class
 class Maze():
@@ -72,7 +109,7 @@ class Maze():
         self.end_point = pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, GAME_WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
 
     # generate maze with a seed
-    def generate_maze(self, seed):
+    def generate_maze(self, seed: int):
         # set seed
         print(f'seed = {seed}')
         random.seed(seed)
@@ -155,7 +192,7 @@ class Maze():
             WIN.blit(vertical_wall_image, (GAME_WIN_WIDTH - WALL_WIDTH, y_coord))
 
 # get all valid move of a grid
-def get_neighbor_girds(grid):
+def get_neighbor_girds(grid: tuple[int, int]) -> list[tuple[int, int]]:
     row, col = grid
     valid_moves = [(0, 1), (0, -1), (-1, 0), (1, 0)]
     if col == 0:
@@ -169,7 +206,7 @@ def get_neighbor_girds(grid):
     return valid_moves
 
 # draw q value
-def draw_q_values(q_learning):
+def draw_q_values(q_learning: Qlearning):
     font = pygame.font.SysFont(FONT, int(0.14 * min(GRID_HEIGHT, GRID_WIDTH)))
     for row in range(MAZE_SIZE[0]):
         for col in range(MAZE_SIZE[1]):
@@ -191,13 +228,13 @@ class Player():
 
 # player class
 class Button():
-    def __init__(self, select = False):
+    def __init__(self, select: bool = False):
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.word =  None
         self.word_pos = None
         self.select = select
     
-    def is_clicked(self, mouse_pos):
+    def is_clicked(self, mouse_pos: tuple[int, int]) -> bool:
         if self.rect.collidepoint(mouse_pos):
             button_click_sfx.play()
             return True
@@ -210,10 +247,10 @@ class Button():
 
 # select buttons class
 class Select_buttons():
-    def __init__(self, len):
+    def __init__(self, len: int):
         self.buttons = [Button() for _ in range(len)]
     
-    def select(self, mouse_pos):
+    def select(self, mouse_pos: tuple[int, int]) -> int:
         for idx, button in enumerate(self.buttons):
             if button.is_clicked(mouse_pos):
                 for b in self.buttons:
@@ -274,7 +311,7 @@ class Panel():
             self.speed_buttons.buttons[i].draw()
 
 # draw window
-def draw_window(maze, coins, player, q_learning, panel, display_q_values):
+def draw_window(maze: Maze, coins: list[pygame.Rect], player: Player, q_learning: Qlearning, panel: Panel, display_q_values: bool):
     # draw background
     WIN.fill(BACKGROUND_COLOR)
     
@@ -306,7 +343,7 @@ def draw_window(maze, coins, player, q_learning, panel, display_q_values):
     pygame.display.update()
 
 # get all valid moves of the position
-def get_valid_moves(maze, player):
+def get_valid_moves(maze: Maze, player: Player) -> list[tuple[int, int]]:
     neighbor_grids = get_neighbor_girds(player.pos)
 
     valid_moves = []
@@ -321,8 +358,8 @@ def get_valid_moves(maze, player):
 
     return valid_moves
 
-# move player with wasd
-def move_player_keyboard(maze, player, keys_pressed):
+# move player with wasd (to be fix)
+def move_player_keyboard(maze: Maze, player: Player, keys_pressed):
     valid_moves = get_valid_moves(maze, player.pos)
     if (keys_pressed == pygame.K_w) and ((-1, 0) in valid_moves):
         player.pos = (player.pos[0] - 1, player.pos[1])
@@ -336,7 +373,7 @@ def move_player_keyboard(maze, player, keys_pressed):
     return player
 
 # move player with input action
-def move_player(maze, player, action):
+def move_player(maze: Maze, player: Player, action: str) -> bool:
     valid_moves = get_valid_moves(maze, player)
     moved = False
     if action == 0:
@@ -364,57 +401,20 @@ def move_player(maze, player, action):
 
     return moved
 
-# new game
-def new_game(maze, player):
+# new game (to be fix)
+def new_game(maze: Maze, player: Player):
     maze = Maze()
     player.rect = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player.pos = (0, 0)
     return maze, player
 
 # reset game
-def reset_game(player):
+def reset_game(player: Player) -> Player:
     player.rect = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
     player.pos = (0, 0)
     return player
 
 # endregion maze game
-
-# region Qlearning
-class Qlearning():
-    # state:player pos:(row, col) action:0->up, 1->left, 2->down, 3->right
-    def __init__(self, episodes, epsilon_decay = 0.99, learning_rate = 0.1, discount_factor = 0.8):
-        self.epsilon = 1
-        self.current_episode = 1
-        self.episodes = episodes
-        self.epsilon_decay = epsilon_decay
-        self.learing_rate = learning_rate
-        self.discount_factor = discount_factor
-        self.q_table = dict()
-        for row in range(MAZE_SIZE[0]):
-            for col in range(MAZE_SIZE[1]):
-                for a in range(4):
-                    self.q_table[(row, col)] = [0, 0, 0, 0]
-
-    def choose_action(self, state):
-        if random.random() < self.epsilon:
-            return random.randint(0, 3)
-        else:
-            actions_q_value = self.q_table[state]
-            return actions_q_value.index(max(actions_q_value))
-    
-    def update_q_value(self, state, state_plus1, action, reward):
-        if random.random() < self.epsilon:
-            future_reward = self.q_table[state_plus1][random.randint(0, 3)]
-        else:
-            actions_q_value = self.q_table[state_plus1]
-            future_reward = max(actions_q_value)
-        self.q_table[state][action] = self.q_table[state][action] + self.learing_rate * (reward + self.discount_factor * future_reward - self.q_table[state][action])
-    
-    def end_episode(self):
-        self.epsilon *= self.epsilon_decay
-        self.current_episode += 1
-
-# endregion Qlearning
 
 # region main
 # main function
