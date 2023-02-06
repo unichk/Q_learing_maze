@@ -3,8 +3,10 @@ import pygame
 import random
 # endregion import
 
+# region pygame init
 pygame.init()
 pygame.mixer.init()
+# endregion pygame init
 
 # region CONSTANT
 # window settings
@@ -28,7 +30,7 @@ BUTTON_SELECTED_COLOR = (110, 110, 110)
 
 # game constants
 GAME_WIN_WIDTH, GAME_WIN_HEIGHT = 600, 600
-MAZE_SIZE = (10, 10)
+MAZE_SIZE = (5, 5)
 WALL_WIDTH = 10
 GRID_WIDTH, GRID_HEIGHT = (GAME_WIN_WIDTH - ((MAZE_SIZE[1] + 1) * WALL_WIDTH)) / MAZE_SIZE[1], (GAME_WIN_HEIGHT - ((MAZE_SIZE[0] + 1) * WALL_WIDTH)) / MAZE_SIZE[0]
 PLAYER_WIDTH, PLAYER_HEIGHT = GRID_WIDTH * 0.45, GRID_HEIGHT * 0.45
@@ -58,6 +60,100 @@ finish_sfx = pygame.mixer.Sound("finish_sfx.mp3")
 # endregion CONSTANT
 
 # region maze game
+# maze class
+class Maze():
+    def __init__(self):
+        self.generate_maze(random.randint(1, 65535))
+        self.all_coins = []
+        for i, grid in enumerate(self.path):
+            if i % 4 == 3:
+                self.all_coins.append(pygame.Rect((WALL_WIDTH + GRID_WIDTH) * grid[1] + WALL_WIDTH + GRID_WIDTH * 0.3, (WALL_WIDTH + GRID_HEIGHT) * grid[0] + WALL_WIDTH + GRID_HEIGHT * 0.3, GRID_WIDTH * 0.4, GRID_HEIGHT * 0.4))
+        self.start_point = pygame.Rect(WALL_WIDTH, WALL_WIDTH, GRID_WIDTH, GRID_HEIGHT)
+        self.end_point = pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, GAME_WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
+
+    # generate maze with a seed
+    def generate_maze(self, seed):
+        # set seed
+        print(f'seed = {seed}')
+        random.seed(seed)
+        
+        # init variables
+        self.vertical_walls, self.horizontal_walls = [[True for j in range(MAZE_SIZE[1])] for i in range(MAZE_SIZE[0])], [[True for j in range(MAZE_SIZE[1])] for i in range(MAZE_SIZE[0])]
+        start_grid = (0, 0)
+        visited = [start_grid]
+        stack = [start_grid]
+
+        # DFS
+        while len(stack) > 0:
+            # get unvisited neighbors
+            grid = stack.pop()
+            moves = get_neighbor_girds(grid)
+            unvisited_neighbors = []
+            for move in moves:
+                if (grid[0] + move[0], grid[1] + move[1]) not in visited:
+                    unvisited_neighbors.append(move)
+            
+            # remove wall randomly if have unvisited neighbors
+            if len(unvisited_neighbors) > 0:
+                stack.append(grid)
+                next = random.choice(unvisited_neighbors)
+                if next == (0, -1):
+                    self.vertical_walls[grid[0]][grid[1]] = False
+                    next = (grid[0], grid[1] - 1)
+                elif next == (0, 1):
+                    self.vertical_walls[grid[0]][grid[1]+1] = False
+                    next = (grid[0], grid[1] + 1)
+                elif next == (-1, 0):
+                    self.horizontal_walls[grid[0]][grid[1]] = False
+                    next = (grid[0] - 1, grid[1])
+                elif next == (1, 0):
+                    self.horizontal_walls[grid[0] + 1][grid[1]] = False
+                    next = (grid[0] + 1, grid[1])
+                visited.append(next)
+                stack.append(next)
+                if next == (MAZE_SIZE[0] - 1, MAZE_SIZE[1] - 1):
+                    self.path = stack.copy()
+    
+    # draw maze
+    def draw(self):
+        # draw start and end point
+        WIN.blit(start_point_image, (self.start_point.x + GRID_WIDTH * 0.15, self.start_point.y + GRID_HEIGHT * 0.15))
+        WIN.blit(end_point_image, (self.end_point.x + GRID_WIDTH * 0.15, self.end_point.y + GRID_HEIGHT * 0.15))
+
+        vertical_wall_image = pygame.transform.scale(wall_image, (WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
+        horizontal_wall_image = pygame.transform.rotate(vertical_wall_image, 90)
+        # draw maze wall
+        for row in range(MAZE_SIZE[0]):
+            for col in range(MAZE_SIZE[1]):
+                x_coord = col * (GRID_WIDTH + WALL_WIDTH)
+                y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
+                # vertical
+                if self.vertical_walls[row][col]:
+                    WIN.blit(vertical_wall_image, (x_coord, y_coord))
+                else:
+                    pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord, y_coord + WALL_WIDTH, WALL_WIDTH, GRID_HEIGHT))
+                # horizontal
+                if self.horizontal_walls[row][col]:
+                    WIN.blit(horizontal_wall_image, (x_coord, y_coord))
+                else:
+                    pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord + WALL_WIDTH, y_coord, GRID_HEIGHT, WALL_WIDTH))
+
+        # draw maze frame
+        # horizontal
+        for col in range(MAZE_SIZE[1]):
+            x_coord = col * (GRID_WIDTH + WALL_WIDTH)
+            # up
+            WIN.blit(horizontal_wall_image, (x_coord, 0))
+            # down
+            WIN.blit(horizontal_wall_image, (x_coord, GAME_WIN_HEIGHT - WALL_WIDTH))
+        # vertical
+        for row in range(MAZE_SIZE[0]):
+            y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
+            # left
+            WIN.blit(vertical_wall_image, (0, y_coord))
+            # right
+            WIN.blit(vertical_wall_image, (GAME_WIN_WIDTH - WALL_WIDTH, y_coord))
+
 # get all valid move of a grid
 def get_neighbor_girds(grid):
     row, col = grid
@@ -72,93 +168,6 @@ def get_neighbor_girds(grid):
         valid_moves.remove((1, 0))
     return valid_moves
 
-# generate maze with a seed
-def generate_maze(seed):
-    # set seed
-    print(f'seed = {seed}')
-    random.seed(seed)
-    
-    # init variables
-    maze_vertical_walls, maze_horizontal_walls = [[True for j in range(MAZE_SIZE[1])] for i in range(MAZE_SIZE[0])], [[True for j in range(MAZE_SIZE[1])] for i in range(MAZE_SIZE[0])]
-    start_grid = (0, 0)
-    visited = [start_grid]
-    stack = [start_grid]
-    path = []
-
-    # DFS
-    while len(stack) > 0:
-        # get unvisited neighbors
-        grid = stack.pop()
-        moves = get_neighbor_girds(grid)
-        unvisited_neighbors = []
-        for move in moves:
-            if (grid[0] + move[0], grid[1] + move[1]) not in visited:
-                unvisited_neighbors.append(move)
-        
-        # remove wall randomly if have unvisited neighbors
-        if len(unvisited_neighbors) > 0:
-            stack.append(grid)
-            next = random.choice(unvisited_neighbors)
-            if next == (0, -1):
-                maze_vertical_walls[grid[0]][grid[1]] = False
-                next = (grid[0], grid[1] - 1)
-            elif next == (0, 1):
-                maze_vertical_walls[grid[0]][grid[1]+1] = False
-                next = (grid[0], grid[1] + 1)
-            elif next == (-1, 0):
-                maze_horizontal_walls[grid[0]][grid[1]] = False
-                next = (grid[0] - 1, grid[1])
-            elif next == (1, 0):
-                maze_horizontal_walls[grid[0] + 1][grid[1]] = False
-                next = (grid[0] + 1, grid[1])
-            visited.append(next)
-            stack.append(next)
-            if next == (MAZE_SIZE[0] - 1, MAZE_SIZE[1] - 1):
-                path = stack.copy()
-    return maze_vertical_walls, maze_horizontal_walls, path
-
-# draw maze
-def draw_maze(maze, start_point, end_point):
-    vertical_walls, horizontal_walls = maze
-
-    # draw start and end point
-    WIN.blit(start_point_image, (start_point.x + GRID_WIDTH * 0.15, start_point.y + GRID_HEIGHT * 0.15))
-    WIN.blit(end_point_image, (end_point.x + GRID_WIDTH * 0.15, end_point.y + GRID_HEIGHT * 0.15))
-
-    vertical_wall_image = pygame.transform.scale(wall_image, (WALL_WIDTH, GRID_HEIGHT + 2 * WALL_WIDTH))
-    horizontal_wall_image = pygame.transform.rotate(vertical_wall_image, 90)
-    # draw maze wall
-    for row in range(MAZE_SIZE[0]):
-        for col in range(MAZE_SIZE[1]):
-            x_coord = col * (GRID_WIDTH + WALL_WIDTH)
-            y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
-            # vertical
-            if vertical_walls[row][col]:
-                WIN.blit(vertical_wall_image, (x_coord, y_coord))
-            else:
-                pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord, y_coord + WALL_WIDTH, WALL_WIDTH, GRID_HEIGHT))
-            # horizontal
-            if horizontal_walls[row][col]:
-                WIN.blit(horizontal_wall_image, (x_coord, y_coord))
-            else:
-                pygame.draw.rect(WIN, BORDER_COLOR, pygame.Rect(x_coord + WALL_WIDTH, y_coord, GRID_HEIGHT, WALL_WIDTH))
-
-    # draw maze frame
-    # horizontal
-    for col in range(MAZE_SIZE[1]):
-        x_coord = col * (GRID_WIDTH + WALL_WIDTH)
-        # up
-        WIN.blit(horizontal_wall_image, (x_coord, 0))
-        # down
-        WIN.blit(horizontal_wall_image, (x_coord, GAME_WIN_HEIGHT - WALL_WIDTH))
-    # vertical
-    for row in range(MAZE_SIZE[0]):
-        y_coord = row * (GRID_HEIGHT + WALL_WIDTH)
-        # left
-        WIN.blit(vertical_wall_image, (0, y_coord))
-        # right
-        WIN.blit(vertical_wall_image, (GAME_WIN_WIDTH - WALL_WIDTH, y_coord))
-
 # draw q value
 def draw_q_values(q_learning):
     font = pygame.font.SysFont(FONT, int(0.14 * min(GRID_HEIGHT, GRID_WIDTH)))
@@ -171,14 +180,106 @@ def draw_q_values(q_learning):
             WIN.blit(font.render(f'{q_learning.q_table[(row, col)][2]:.2f}', True, TEXT_COLOR), (x_coord + WALL_WIDTH + GRID_WIDTH / 3, y_coord + WALL_WIDTH + GRID_HEIGHT * 8 / 10))
             WIN.blit(font.render(f'{q_learning.q_table[(row, col)][3]:.2f}', True, TEXT_COLOR), (x_coord + WALL_WIDTH + GRID_WIDTH * 5 / 9, y_coord + WALL_WIDTH + GRID_HEIGHT *4 / 9))
 
+# player class
+class Player():
+    def __init__(self):
+        self.rect = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
+        self.pos = (0, 0)
+        self.direction = "d"
+        self.last_pos = None
+        self.last_last_pos = None
+
+# player class
+class Button():
+    def __init__(self, select = False):
+        self.rect = pygame.Rect(0, 0, 0, 0)
+        self.word =  None
+        self.word_pos = None
+        self.select = select
+    
+    def is_clicked(self, mouse_pos):
+        if self.rect.collidepoint(mouse_pos):
+            button_click_sfx.play()
+            return True
+        return False
+    
+    def draw(self):
+        WIN.blit(self.word, self.word_pos)
+        if self.select:
+            pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, self.rect, int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
+
+# select buttons class
+class Select_buttons():
+    def __init__(self, len):
+        self.buttons = [Button() for _ in range(len)]
+    
+    def select(self, mouse_pos):
+        for idx, button in enumerate(self.buttons):
+            if button.is_clicked(mouse_pos):
+                for b in self.buttons:
+                    b.select = False
+                button.select = True
+                return idx
+
+# panel class
+class Panel():
+    def __init__(self):
+        self.texts = []
+        self.texts_pos = []
+        self.show_hide_q_values_buttons = Select_buttons(2)
+        self.show_hide_q_values_buttons.buttons[0].select = True
+        self.speed_buttons = Select_buttons(5)
+        self.speed_buttons.buttons[2].select = True
+    
+    def init_panel(self):
+        font = pygame.font.SysFont(FONT, FONT_SIZE)
+        
+        # init texts pos
+        y_coord = 20
+        for _ in self.texts:
+            self.texts_pos.append((GAME_WIN_WIDTH + 30, y_coord))
+            y_coord += FONT_SIZE * 13 / 9
+        
+        # init show/hide q values button
+        self.texts.append(font.render(f'Q value: ', True, TEXT_COLOR))
+        self.texts_pos.append((GAME_WIN_WIDTH + 30, y_coord))
+        self.show_hide_q_values_buttons.buttons[0].word, self.show_hide_q_values_buttons.buttons[0].word_pos = font.render(f'show', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 9 * FONT_SIZE * 0.52, y_coord)
+        self.show_hide_q_values_buttons.buttons[1].word, self.show_hide_q_values_buttons.buttons[1].word_pos = font.render(f'hide', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 15 * FONT_SIZE * 0.52, y_coord)
+        self.show_hide_q_values_buttons.buttons[0].rect = pygame.Rect(GAME_WIN_WIDTH + 30 + 8.5 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 6 * FONT_SIZE * 0.52, FONT_SIZE * 1.3)
+        self.show_hide_q_values_buttons.buttons[1].rect = pygame.Rect(GAME_WIN_WIDTH + 30 + 14.5 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 5.1 * FONT_SIZE * 0.52, FONT_SIZE * 1.3)
+        y_coord += FONT_SIZE * 13 / 9
+
+        # init speed buttons
+        self.texts.append(font.render(f'speed: ', True, TEXT_COLOR))
+        self.texts_pos.append((GAME_WIN_WIDTH + 30, y_coord))
+        for i in range(5):
+            self.speed_buttons.buttons[i].word, self.speed_buttons.buttons[i].word_pos = font.render(f'{i + 1}', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + (8 + 2 * i) * FONT_SIZE * 0.52, y_coord)
+            self.speed_buttons.buttons[i].rect = pygame.Rect(GAME_WIN_WIDTH + 30 + (8 + 2 * i - 0.4) * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3)
+
+    # draw panel
+    def draw(self):
+        # draw info
+        y_coord = 20
+        for idx, text in enumerate(self.texts):
+            WIN.blit(text, self.texts_pos[idx])    
+            y_coord += FONT_SIZE * 13 / 9
+
+        # draw q value button
+        self.show_hide_q_values_buttons.buttons[0].draw()
+        self.show_hide_q_values_buttons.buttons[1].draw()
+        y_coord += FONT_SIZE * 13 / 9
+
+        # draw speed buttons
+        for i in range(5):
+            self.speed_buttons.buttons[i].draw()
+
 # draw window
-def draw_window(maze, coins, start_point, end_point, player, player_direction, q_learning, display_q_values, texts, speed):
-    font = pygame.font.SysFont(FONT, FONT_SIZE)
+def draw_window(maze, coins, player, q_learning, panel, display_q_values):
     # draw background
     WIN.fill(BACKGROUND_COLOR)
     
     # draw maze
-    draw_maze(maze, start_point, end_point)
+    maze.draw()
 
     # draw coin
     for coin in coins:
@@ -189,95 +290,92 @@ def draw_window(maze, coins, start_point, end_point, player, player_direction, q
         draw_q_values(q_learning)
 
     # draw player 
-    if player_direction == "u":
+    if player.direction == "u":
         WIN.blit(player_up, player)
-    elif player_direction == "d":
+    elif player.direction == "d":
         WIN.blit(player_down, player)
-    elif player_direction == "r":
+    elif player.direction == "r":
         WIN.blit(player_right, player)
-    elif player_direction == "l":
+    elif player.direction == "l":
         WIN.blit(player_left, player)
-    # draw info
-    y_coord = 20
-    for text in texts:
-        WIN.blit(text, (GAME_WIN_WIDTH + 30, y_coord))    
-        y_coord += FONT_SIZE * 13 / 9
 
-    # draw q value button
-    WIN.blit(font.render(f'Q value: ', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30, y_coord))
-    WIN.blit(font.render(f'show', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 9 * FONT_SIZE * 0.52, y_coord))
-    WIN.blit(font.render(f'hide', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 15 * FONT_SIZE * 0.52, y_coord))
-    show_q_values_button = pygame.Rect(GAME_WIN_WIDTH + 30 + 8.5 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 6 * FONT_SIZE * 0.52, FONT_SIZE * 1.3)
-    hide_q_values_button = pygame.Rect(GAME_WIN_WIDTH + 30 + 14.5 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 5.1 * FONT_SIZE * 0.52, FONT_SIZE * 1.3)
-    if display_q_values:
-        pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, show_q_values_button, int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
-    else:
-        pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, hide_q_values_button, int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
-    y_coord += FONT_SIZE * 13 / 9
-
-    # draw speed buttons
-    WIN.blit(font.render(f'speed: ', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30, y_coord))
-    WIN.blit(font.render(f'1', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 8 * FONT_SIZE * 0.52, y_coord))
-    WIN.blit(font.render(f'2', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 10 * FONT_SIZE * 0.52, y_coord))
-    WIN.blit(font.render(f'3', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 12 * FONT_SIZE * 0.52, y_coord))
-    WIN.blit(font.render(f'4', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 14 * FONT_SIZE * 0.52, y_coord))
-    WIN.blit(font.render(f'5', True, TEXT_COLOR), (GAME_WIN_WIDTH + 30 + 16 * FONT_SIZE * 0.52, y_coord))
-    speed_button = []
-    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 7.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
-    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 9.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
-    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 11.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
-    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 13.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
-    speed_button.append(pygame.Rect(GAME_WIN_WIDTH + 30 + 15.6 * FONT_SIZE * 0.52, y_coord + FONT_SIZE * 0.03, 2 * FONT_SIZE * 0.52, FONT_SIZE * 1.3))
-    pygame.draw.rect(WIN, BUTTON_SELECTED_COLOR, speed_button[speed], int(FONT_SIZE * 0.1), int(FONT_SIZE * 1.2))
+    # draw panel
+    panel.draw()
 
     # upadate window
     pygame.display.update()
-    
-    return show_q_values_button, hide_q_values_button, speed_button
 
 # get all valid moves of the position
-def get_valid_moves(maze, player_pos):
-    vertical_walls, horizontal_walls = maze
-    neighbor_grids = get_neighbor_girds(player_pos)
+def get_valid_moves(maze, player):
+    neighbor_grids = get_neighbor_girds(player.pos)
 
     valid_moves = []
-    if ((0, -1) in neighbor_grids) and (vertical_walls[player_pos[0]][player_pos[1]] == False):
+    if ((0, -1) in neighbor_grids) and (maze.vertical_walls[player.pos[0]][player.pos[1]] == False):
         valid_moves.append((0, -1))
-    if ((0, 1) in neighbor_grids) and (vertical_walls[player_pos[0]][player_pos[1] + 1] == False):
+    if ((0, 1) in neighbor_grids) and (maze.vertical_walls[player.pos[0]][player.pos[1] + 1] == False):
         valid_moves.append((0, 1))
-    if ((-1, 0) in neighbor_grids) and (horizontal_walls[player_pos[0]][player_pos[1]] == False):
+    if ((-1, 0) in neighbor_grids) and (maze.horizontal_walls[player.pos[0]][player.pos[1]] == False):
         valid_moves.append((-1, 0))
-    if ((1, 0) in neighbor_grids) and (horizontal_walls[player_pos[0] + 1][player_pos[1]] == False):
+    if ((1, 0) in neighbor_grids) and (maze.horizontal_walls[player.pos[0] + 1][player.pos[1]] == False):
         valid_moves.append((1, 0))
 
     return valid_moves
 
 # move player with wasd
-def move_player(maze, player_pos, keys_pressed):
-    valid_moves = get_valid_moves(maze, player_pos)
+def move_player_keyboard(maze, player, keys_pressed):
+    valid_moves = get_valid_moves(maze, player.pos)
     if (keys_pressed == pygame.K_w) and ((-1, 0) in valid_moves):
-        player_pos = (player_pos[0] - 1, player_pos[1])
+        player.pos = (player.pos[0] - 1, player.pos[1])
     if (keys_pressed == pygame.K_a) and ((0, -1) in valid_moves):
-        player_pos = (player_pos[0], player_pos[1] - 1)
+        player.pos = (player.pos[0], player.pos[1] - 1)
     if (keys_pressed == pygame.K_s) and ((1, 0) in valid_moves):
-        player_pos = (player_pos[0] + 1, player_pos[1])
+        player.pos = (player.pos[0] + 1, player.pos[1])
     if (keys_pressed == pygame.K_d) and ((0, 1) in valid_moves):
-        player_pos = (player_pos[0], player_pos[1] + 1)
+        player.pos = (player.pos[0], player.pos[1] + 1)
 
-    return player_pos
+    return player
+
+# move player with input action
+def move_player(maze, player, action):
+    valid_moves = get_valid_moves(maze, player)
+    moved = False
+    if action == 0:
+        if (-1, 0) in valid_moves:
+            player.pos = (player.pos[0] - 1, player.pos[1])
+            moved = True
+        player.direction = "u"
+    elif action == 1:
+        if (0, -1) in valid_moves:
+            player.pos = (player.pos[0], player.pos[1] - 1)
+            moved = True
+        player.direction = "l"
+    elif action == 2:
+        if (1, 0) in valid_moves:
+            player.pos = (player.pos[0] + 1, player.pos[1])
+            moved = True
+        player.direction = "d"
+    elif action == 3:
+        if (0, 1) in valid_moves:
+            player.pos = (player.pos[0], player.pos[1] + 1)
+            moved = True
+        player.direction = "r"
+    player.rect.x = (WALL_WIDTH + GRID_WIDTH) * player.pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
+    player.rect.y = (WALL_WIDTH + GRID_HEIGHT) * player.pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+
+    return moved
 
 # new game
-def new_game(maze, player, player_pos):
-    maze = generate_maze(random.randint(1, 65535))
-    player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
-    player_pos = (0, 0)
-    return maze, player, player_pos
+def new_game(maze, player):
+    maze = Maze()
+    player.rect = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
+    player.pos = (0, 0)
+    return maze, player
 
 # reset game
-def reset_game(player, player_pos):
-    player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
-    player_pos = (0, 0)
-    return player, player_pos
+def reset_game(player):
+    player.rect = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
+    player.pos = (0, 0)
+    return player
 
 # endregion maze game
 
@@ -325,19 +423,9 @@ def main():
     run = True
 
     # init game
-    *maze, path = generate_maze(random.randint(1, 65535))
-    all_coins = []
-    for i, grid in enumerate(path):
-        if i % 4 == 3:
-            all_coins.append(pygame.Rect((WALL_WIDTH + GRID_WIDTH) * grid[1] + WALL_WIDTH + GRID_WIDTH * 0.3, (WALL_WIDTH + GRID_HEIGHT) * grid[0] + WALL_WIDTH + GRID_HEIGHT * 0.3, GRID_WIDTH * 0.4, GRID_HEIGHT * 0.4))
-    coins = all_coins.copy()
-    start_point = pygame.Rect(WALL_WIDTH, WALL_WIDTH, GRID_WIDTH, GRID_HEIGHT)
-    end_point = pygame.Rect(GAME_WIN_WIDTH - WALL_WIDTH - GRID_WIDTH, GAME_WIN_HEIGHT - WALL_WIDTH - GRID_HEIGHT, GRID_WIDTH, GRID_HEIGHT)
-    player = pygame.Rect(WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2, WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT)
-    player_pos = (0, 0)
-    player_direction = "d"
-    last_pos = None
-    last_last_pos = None
+    maze = Maze()
+    coins = maze.all_coins.copy()
+    player = Player()
 
     # init training
     frame_per_move = 10
@@ -347,22 +435,20 @@ def main():
     first_finish_episode = None
     minium_move_spent = 1e9
 
-    # init panel texts
+    # init panel
+    panel = Panel()
     font = pygame.font.SysFont(FONT, FONT_SIZE)
-    texts = []
-    texts.append(font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR))
-    texts.append(font.render(f'move left: {move_left}', True, TEXT_COLOR))
-    texts.append(font.render(f'epsilon: {q_learning.epsilon}', True, TEXT_COLOR))
-    texts.append(font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR))
-    texts.append(font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR))
+    panel.texts.append(font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR))
+    panel.texts.append(font.render(f'move left: {move_left}', True, TEXT_COLOR))
+    panel.texts.append(font.render(f'epsilon: {q_learning.epsilon}', True, TEXT_COLOR))
+    panel.texts.append(font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR))
+    panel.texts.append(font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR))
+    panel.init_panel()
     
-    # init button
+    # init control settings
     show_q_values = True
-    show_q_values_button = pygame.Rect(0, 0, 0, 0)
-    hide_q_values_button = pygame.Rect(0, 0, 0, 0)
     speed = 2 # 0->1,60 1->2,30 2->3,10 3->4,5 4->5,1
     speed_dict = {0:60, 1:30, 2:10, 3:5, 4:1}
-    speed_buttons = [pygame.Rect(0, 0, 0, 0)]*5
 
     # game loop
     while run:
@@ -373,105 +459,78 @@ def main():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # check is show/hide q value button is clicked
-                if show_q_values_button.collidepoint(event.pos):
-                    show_q_values = True
-                    button_click_sfx.play()
-                if hide_q_values_button.collidepoint(event.pos):
-                    show_q_values = False
-                    button_click_sfx.play()
+                button_clicked = panel.show_hide_q_values_buttons.select(event.pos)
+                if button_clicked != None:
+                    show_q_values = True if show_q_values == 0 else False
                 # check is speed buttons is clicked
-                for idx, button in enumerate(speed_buttons):
-                    if button.collidepoint(event.pos):
-                        speed = idx
-                        frame_per_move = speed_dict[idx]
-                        button_click_sfx.play()
+                button_clicked = panel.speed_buttons.select(event.pos)
+                if button_clicked != None:
+                    speed = button_clicked
+                    frame_per_move = speed_dict[speed]
             # region keyboard control
             # if event.type == pygame.KEYDOWN:
             #     # update player pos from input
-            #     player_pos = move_player(maze, player_pos, event.key)
-            #     player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
-            #     player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+            #     player.pos = move_player(maze, player, event.key)
+            #     player.rect.x = (WALL_WIDTH + GRID_WIDTH) * player.pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
+            #     player.rect.y = (WALL_WIDTH + GRID_HEIGHT) * player.pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
                 
             #     # check has the player finished
-            #     if player.colliderect(end_point):
+            #     if player.rect.colliderect(end_point):
             #         # restart game
-            #         maze, player, player_pos = new_game(maze, player, player_pos)
+            #         maze, player = new_game(maze, player)
             # endregion keyboard control
 
         # make action and update q table
         if move_clock == 0:
             # choose action and move
-            # fix player direction
-            player_pos_before = player_pos
-            action = q_learning.choose_action(player_pos)
-            valid_moves = get_valid_moves(maze, player_pos)
-            moved = False
-            if action == 0:
-                if (-1, 0) in valid_moves:
-                    player_pos = (player_pos[0] - 1, player_pos[1])
-                    moved = True
-                player_direction = "u"
-            elif action == 1:
-                if (0, -1) in valid_moves:
-                    player_pos = (player_pos[0], player_pos[1] - 1)
-                    moved = True
-                player_direction = "l"
-            elif action == 2:
-                if (1, 0) in valid_moves:
-                    player_pos = (player_pos[0] + 1, player_pos[1])
-                    moved = True
-                player_direction = "d"
-            elif action == 3:
-                if (0, 1) in valid_moves:
-                    player_pos = (player_pos[0], player_pos[1] + 1)
-                    moved = True
-                player_direction = "r"
-            player.x = (WALL_WIDTH + GRID_WIDTH) * player_pos[1] + WALL_WIDTH + GRID_WIDTH / 2  - PLAYER_WIDTH / 2
-            player.y = (WALL_WIDTH + GRID_HEIGHT) * player_pos[0] + WALL_WIDTH + GRID_HEIGHT / 2  - PLAYER_HEIGHT / 2
+            player_pos_before = player.pos
+            action = q_learning.choose_action(player.pos)
+            moved = move_player(maze, player, action)
             move_left -= 1
 
-            reward = 0
             # calculate reward
+            reward = 0
             if not moved:
                 reward -= 1
-            if player.colliderect(end_point):
+            if player.rect.colliderect(maze.end_point):
                 reward += 100
                 finish_sfx.play()
                 if first_finish_episode == None:
                     first_finish_episode = q_learning.current_episode
                 minium_move_spent = min(minium_move_spent, MOVE_PER_EPISODE - move_left)
             for coin in coins:
-                if player.colliderect(coin):
+                if player.rect.colliderect(coin):
                     reward += 5
                     coins.remove(coin)
-            if player_pos == last_last_pos:
+            if player.pos == player.last_last_pos:
                 reward -= 1
 
             # update player pos history
-            last_last_pos = last_pos
-            last_pos = player_pos
+            player.last_last_pos = player.last_pos
+            player.last_pos = player.pos
 
             # update Q table
-            q_learning.update_q_value(player_pos_before, player_pos, action, reward)
+            q_learning.update_q_value(player_pos_before, player.pos, action, reward)
 
-            # update text
-            texts[0] = font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR)
-            texts[1] = font.render(f'move left: {move_left}', True, TEXT_COLOR)
-            texts[2] = font.render(f'epsilon: {q_learning.epsilon:.6f}', True, TEXT_COLOR)
-            texts[3] = font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR)
-            texts[4] = font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR)
+            # update panel text
+            panel.texts[0] = font.render(f'episode num: {q_learning.current_episode}', True, TEXT_COLOR)
+            panel.texts[1] = font.render(f'move left: {move_left}', True, TEXT_COLOR)
+            panel.texts[2] = font.render(f'epsilon: {q_learning.epsilon:.6f}', True, TEXT_COLOR)
+            panel.texts[3] = font.render(f'first success: {first_finish_episode if first_finish_episode != None else " "}', True, TEXT_COLOR)
+            panel.texts[4] = font.render(f'fastest: {minium_move_spent if minium_move_spent != 1e9 else " "} moves', True, TEXT_COLOR)
 
             # end episode if finish or out of moves
-            if move_left == 0 or player.colliderect(end_point):
+            if move_left == 0 or player.rect.colliderect(maze.end_point):
                 q_learning.end_episode()
-                player, player_pos = reset_game(player, player_pos)
-                coins = all_coins.copy()
+                player = reset_game(player)
+                coins = maze.all_coins.copy()
                 move_left = MOVE_PER_EPISODE
 
             # reset move clock
             move_clock = frame_per_move
 
-        show_q_values_button, hide_q_values_button, speed_buttons = draw_window(maze, coins, start_point, end_point, player, player_direction, q_learning, show_q_values, texts, speed)
+            draw_window(maze, coins, player, q_learning, panel, show_q_values)
+        
         move_clock -= 1
 
     pygame.quit()
