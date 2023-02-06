@@ -62,7 +62,7 @@ finish_sfx = pygame.mixer.Sound("finish_sfx.mp3")
 # region Qlearning
 class Qlearning():
     # state:player pos:(row, col) action:0->up, 1->left, 2->down, 3->right
-    def __init__(self, episodes, epsilon_decay = 0.99, learning_rate = 0.1, discount_factor = 0.8):
+    def __init__(self, episodes: int, epsilon_decay: float = 0.99, learning_rate: float = 0.1, discount_factor: float = 0.8):
         self.epsilon = 1
         self.current_episode = 1
         self.episodes = episodes
@@ -75,14 +75,14 @@ class Qlearning():
                 for a in range(4):
                     self.q_table[(row, col)] = [0, 0, 0, 0]
 
-    def choose_action(self, state):
+    def choose_action(self, state: tuple[int, int]) -> int:
         if random.random() < self.epsilon:
             return random.randint(0, 3)
         else:
             actions_q_value = self.q_table[state]
             return actions_q_value.index(max(actions_q_value))
     
-    def update_q_value(self, state, state_plus1, action, reward):
+    def update_q_value(self, state: tuple[int, int], state_plus1: tuple[int, int], action: int, reward: int):
         if random.random() < self.epsilon:
             future_reward = self.q_table[state_plus1][random.randint(0, 3)]
         else:
